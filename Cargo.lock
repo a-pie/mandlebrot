@@ -183,6 +183,7 @@ version = "0.1.0"
 dependencies = [
  "image",
  "num",
+ "num-complex",
 ]
 
 [[package]]

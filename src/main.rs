@@ -4,9 +4,12 @@ use image::ColorType;
 use image::png::PNGEncoder; 
 use std::fs::File;
 use std::env;
-
+use image::{GenericImage, ImageBuffer, RgbImage, imageops};
+extern crate image;
 
 fn main() {
+    fractal(); //run fractal before exit if bad args
+
     let args: Vec < String > = env::args(). collect(); 
     if args.len() != 5 { 
         eprintln!("Usage: {} FILE PIXELS UPPERLEFT LOWERRIGHT", args[ 0]); 
@@ -47,8 +50,8 @@ fn parse_complex( s: &str) -> Option < Complex < f64 > > {
     match s.find(separator) { 
         None => None, 
         Some(index) => { 
-            match (T:: from_str(& s[..index]), T:: from_str(& s[index + 1..])) { 
-                 (Ok( l), Ok( r)) => Some(( l, r)),
+            match (T:: from_str(&s[..index]), T:: from_str(&s[index + 1..])) { 
+                 (Ok(l), Ok( r)) => Some((l, r)),
                  _ => None 
             } 
         } 
@@ -60,8 +63,8 @@ fn parse_complex( s: &str) -> Option < Complex < f64 > > {
 /// file named ` filename `. 
 fn write_image(filename: &str, pixels: &[u8], bounds: (usize, usize)) -> Result<(), std::io::Error> { 
     let output = File::create(filename)?; 
-    let encoder = PNGEncoder::new( output); 
-    encoder.encode(pixels, bounds. 0 as u32, bounds. 1 as u32, ColorType:: Gray( 8))?; 
+    let encoder = PNGEncoder::new(output); 
+    encoder.encode(pixels, bounds.0 as u32, bounds.1 as u32, ColorType::RGB(8))?; 
     Ok(())
 }
 
@@ -86,15 +89,15 @@ fn pixel_to_point(bounds: (usize, usize), pixel: (usize, usize),
 /// which holds one grayscale pixel per byte. The ` upper_left ` and ` lower_right ` 
 /// arguments specify points on the complex plane corresponding to the upper- 
 /// left and lower-right corners of the pixel buffer. 
-fn render(pixels: &mut [u8], bounds: (usize, usize), upper_left: Complex < f64 >, lower_right: Complex < f64 >) { 
+fn render(pixels: &mut[u8], bounds: (usize, usize), upper_left: Complex <f64>, lower_right: Complex <f64>) { 
     assert!(pixels.len() == bounds. 0 * bounds. 1); 
     for row in 0.. bounds. 1 { 
         for column in 0.. bounds. 0 { 
-            let point = pixel_to_point( bounds, (column, row), upper_left, lower_right);
+            let point = pixel_to_point(bounds, (column, row), upper_left, lower_right);
             pixels[ row * bounds. 0 + column] = 
                 match escape_time(point, 255) { 
                     None => 0, 
-                    Some( count) => 255 - count as u8 
+                    Some(count) => 255 - count as u8 
             }; 
         } 
     } 
@@ -117,6 +120,49 @@ fn escape_time(c: Complex < f64 >, limit: usize) -> Option < usize > {
         z = z * z + c; 
     } 
     None 
+}
+
+// An example of generating julia fractals.
+fn fractal() {
+    let imgx = 800;
+    let imgy = 800;
+
+    let scalex = 3.0 / imgx as f32;
+    let scaley = 3.0 / imgy as f32;
+
+    // Create a new ImgBuf with width: imgx and height: imgy
+    let mut imgbuf = image::ImageBuffer::new(imgx, imgy);
+
+    // Iterate over the coordinates and pixels of the image
+    for (x, y, pixel) in imgbuf.enumerate_pixels_mut() {
+        let r = (0.3 * x as f32) as u8;
+        let b = (0.3 * y as f32) as u8;
+        *pixel = image::Rgb([r, 0, b]);
+    }
+
+    // A redundant loop to demonstrate reading image data
+    for x in 0..imgx {
+        for y in 0..imgy {
+            let cx = y as f32 * scalex - 1.5;
+            let cy = x as f32 * scaley - 1.5;
+
+            let c = num_complex::Complex::new(-0.4, 0.6);
+            let mut z = num_complex::Complex::new(cx, cy);
+
+            let mut i = 0;
+            while i < 255 && z.norm() <= 2.0 {
+                z = z * z + c;
+                i += 1;
+            }
+
+            let pixel = imgbuf.get_pixel_mut(x, y);
+            let data = (*pixel as image::Rgb<u8>);
+            *pixel = image::Rgb([data[0], i as u8, data[2]]);
+        }
+    }
+
+    // Save the image as “fractal.png”, the format is deduced from the path
+    imgbuf.save("fractal.png").unwrap();
 }
 
 #[test] 
