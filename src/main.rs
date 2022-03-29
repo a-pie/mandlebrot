@@ -174,7 +174,6 @@ fn fractal() {
     imgbuf.save("fractal.png").unwrap();
 }
 
-
 /*
             Test Section
 */
